@@ -1,0 +1,404 @@
+以下是分析过程中的一点总结，相对还很粗糙，还需要不断完善。具体还是要在实际过程中多分析，多留意，意识上要关注，就会慢慢知道这是什么加解密算法。
+
+
+0x1 作用与方法
+0x2 常见加解密算法的特点
+    0x21 hash算法
+    0x22 对称加密算法
+    0x23 公开密钥加密算法
+    0x24 其他算法
+0x3 实例
+
+
+
+0x1 作用与方法
+
+分析应用协议，数据包经常会存在各种加密情况，在分析数据包中存在不断进行改变的大量字节，极有可能使用了某种加密方法
+在实际分析中能够对常见的加解密、摘要算法进行识别，对还原数据包进行进一步分析起着很有效的作用
+
+大致的方法是:
+1.使用PEiD的Kcrypto ANALyzer(Kanal)、OD或者IDA的findcrypt插件、Hash & Crypto Detector等等工具进行识别
+2.实际分析中，能够肉眼识别的话，对分析更加有帮助，尤其是遇到变形的情况
+具体通过每种加密算法的独特的加解密处理过程，如是否为Feistel网络，加密轮数，密钥长度，子密钥生成过程，S-box的值，进一步确认采用何种工作模式等等等特点进行识别
+
+当然对这些算法如果非常熟，就能够从原理上，从汇编代码上就能够清晰的通过处理流程就大致判断出来。所以理解算法整个处理过程是很重要的。
+其中RC4、TEA、IDEA用目前的插件探测效果不好，可能需要寻找进一步的解决方法
+
+
+
+0x2 常见加解密算法的特点
+会列举常见的加解密、摘要算法的特点
+
+
+0x21 hash算法
+1.MD5:产生128位的消息摘要
+
+数据填充->添加长度->初始化变量->数据处理(F、G、H、I)，需要一张加法常数表T[i],i为1至64之中的值，作为特征识别
+
+常量67452301、EFCDAB89、EFCDAB89、98BADCFE、10325476，作为特征识别
+
+.text:004011D0                 lea     ecx, [esp+3D8h+var_2B0]
+.text:004011D7                 mov     [esp+3D8h+var_3C3+3], edx
+.text:004011DB                 push    ecx                          ;context
+.text:004011DC                 mov     [esp+3DCh+var_3BF+3], eax
+.text:004011E0                 call    sub_4012B0                   ;md5_init
+.text:004011E5                 lea     edx, [esp+3DCh+String]
+.text:004011EC                 push    edi
+.text:004011ED                 lea     eax, [esp+3E0h+var_2B0]
+.text:004011F4                 push    edx
+.text:004011F5                 push    eax
+.text:004011F6                 call    sub_4012E0                   ;md5_update
+.text:004011FB                 add     esp, 10h
+.text:004011FE                 lea     ecx, [esp+3D8h+var_3B4]
+.text:00401202                 push    ecx             ; lpString
+.text:00401203                 call    ds:lstrlenA
+.text:00401209                 push    eax
+.text:0040120A                 lea     edx, [esp+3DCh+var_3B4]
+.text:0040120E                 lea     eax, [esp+3DCh+var_2B0]
+.text:00401215                 push    edx
+.text:00401216                 push    eax
+.text:00401217                 call    sub_4012E0
+.text:0040121C                 lea     ecx, [esp+3E4h+var_2B0]
+.text:00401223                 lea     edx, [esp+3E4h+var_258]
+.text:0040122A                 push    ecx
+.text:0040122B                 push    edx                         ;最后输出的hash
+.text:0040122C                 call    sub_401390                  ;md5_final
+
+.text:004012B0 sub_4012B0      proc near               ; md5_init
+.text:004012B0
+.text:004012B0 arg_0           = dword ptr  4
+.text:004012B0
+.text:004012B0                 mov     eax, [esp+arg_0]
+.text:004012B4                 xor     ecx, ecx
+.text:004012B6                 mov     [eax+14h], ecx
+.text:004012B9                 mov     [eax+10h], ecx
+.text:004012BC                 mov     dword ptr [eax], 67452301h
+.text:004012C2                 mov     dword ptr [eax+4], 0EFCDAB89h
+.text:004012C9                 mov     dword ptr [eax+8], 98BADCFEh
+.text:004012D0                 mov     dword ptr [eax+0Ch], 10325476h
+.text:004012D7                 retn
+.text:004012D7 sub_4012B0      endp
+
+
+
+md5_update中存在md5_transform
+text:0040154E  lea     ebx, [ebx+edx-2B96AFFh]等取T[i]正常数表中的元素
+会存在call F、G、H、I函数
+
+
+2.SHA系列
+与MD5基本类似，差别在于一些常数
+
+密码学中的Hash算法还有很多种，如RIPEMD、HAVAL、Tiger等，建议选择SHA-256/384/512或者Whirlpool
+有时候还要考虑算法是否变形
+
+
+
+0x22 对称加密算法
+
+1.RC4流加密
+RC4生成一种称为密钥流的伪随机流，同明文通过异或操作相混合以达到加密的目的
+密钥流由两个部分组成:KSA和PRGA
+首先使用KSA完成对256的字节数组的初始化及替换，通过PRGA得到子密码，用子密码和明文进行xor运算
+
+.text:00401319                 push    8
+.text:0040131B                 rep stosd
+.text:0040131D                 lea     ecx, [esp+620h+var_610]
+.text:00401321                 lea     edx, [esp+620h+var_408]
+.text:00401328                 push    ecx
+.text:00401329                 push    edx
+.text:0040132A                 call    sub_401000                ;初始化数组s
+.text:0040132F                 lea     eax, [esp+628h+String]
+.text:00401333                 push    ebp
+.text:00401334                 lea     ecx, [esp+62Ch+var_408]
+.text:0040133B                 push    eax
+.text:0040133C                 push    ecx
+.text:0040133D                 call    sub_401070               ;rc4
+.text:00401342                 add     esp, 18h
+
+其中call sub_401000 
+会存在如下
+.text:00401027                 xor     eax, eax
+.text:00401029                 mov     edi, ebp
+.text:0040102B                 mov     [esp+10h+arg_0], 100h    ;数组S大小为256
+
+加密算法中会存在xor
+
+
+2.TEA算法
+TEA的分组长度为64位，密钥长度128位。推荐使用32次循环加密，即64轮
+注意密钥调度常数是特征，delta=0x9e3779b9,还有就是进行循环异或
+.text:00401031                 mov     edi, 20h              ;特征:进行了32次循环加密
+.text:00401036
+.text:00401036 loc_401036:                             ; CODE XREF: sub_401000+7Bj
+.text:00401036                 mov     ebx, [esp+1Ch+arg_4]
+.text:0040103A                 mov     ebp, [esp+1Ch+var_C]
+.text:0040103E                 mov     esi, ecx
+.text:00401040                 sub     edx, 61C88647h        ;特征，delta，edx-0x61C88647=0x9e3779b7
+.text:00401046                 shl     esi, 4
+.text:00401049                 add     esi, ebx
+.text:0040104B                 mov     ebx, ecx
+.text:0040104D                 shr     ebx, 5
+.text:00401050                 add     ebx, ebp
+.text:00401052                 mov     ebp, [esp+1Ch+var_4]
+.text:00401056                 xor     esi, ebx
+.text:00401058                 lea     ebx, [edx+ecx]
+.text:0040105B                 xor     esi, ebx
+.text:0040105D                 mov     ebx, [esp+1Ch+var_8]
+.text:00401061                 add     eax, esi
+.text:00401063                 mov     esi, eax
+.text:00401065                 shl     esi, 4
+.text:00401068                 add     esi, ebx
+.text:0040106A                 mov     ebx, eax
+.text:0040106C                 shr     ebx, 5
+.text:0040106F                 add     ebx, ebp
+.text:00401071                 xor     esi, ebx
+.text:00401073                 lea     ebx, [edx+eax]
+.text:00401076                 xor     esi, ebx
+.text:00401078                 add     ecx, esi
+.text:0040107A                 dec     edi
+.text:0040107B                 jnz     short loc_401036
+.text:0040107D                 mov     edx, [esp+1Ch+arg_0]
+.text:00401081                 pop     edi
+.text:00401082                 pop     esi
+.text:00401083                 pop     ebp
+.text:00401084                 mov     [edx], eax
+.text:00401086                 mov     [edx+4], ecx
+
+
+3.IDEA算法
+分组密码IDEA明文和密文的分组长度为64位，密钥长度为128位
+特征，模2^16+1乘法运算
+.text:00401340                 mov     ecx, [esp+arg_0]
+.text:00401344                 test    ecx, ecx
+.text:00401346                 jnz     short loc_401359
+.text:00401348                 mov     ecx, [esp+arg_4]
+.text:0040134C                 mov     eax, 10001h       ;0x10001即65537
+.text:00401351                 sub     eax, ecx
+.text:00401353                 and     eax, 0FFFFh
+.text:00401358                 retn
+.text:00401359 ; ---------------------------------------------------------------------------
+.text:00401359
+.text:00401359 loc_401359:                             
+.text:00401359                 mov     eax, [esp+arg_4]
+.text:0040135D                 test    eax, eax
+.text:0040135F                 jnz     short loc_40136E
+.text:00401361                 mov     eax, 10001h
+.text:00401366                 sub     eax, ecx
+.text:00401368                 and     eax, 0FFFFh
+.text:0040136D                 retn
+.text:0040136E ; ---------------------------------------------------------------------------
+.text:0040136E
+.text:0040136E loc_40136E:                             
+.text:0040136E                 imul    ecx, eax         
+.text:00401371                 mov     eax, ecx
+.text:00401373                 shr     ecx, 10h         ;q右移16位，即除以65536
+.text:00401376                 and     eax, 0FFFFh      ;q%65536
+.text:0040137B                 sub     eax, ecx 
+.text:0040137D                 test    eax, eax
+.text:0040137F                 jg      short loc_401386
+.text:00401381                 add     eax, 10001h
+.text:00401386
+.text:00401386 loc_401386:                             
+.text:00401386                 and     eax, 0FFFFh
+.text:0040138B                 retn
+
+
+4.BlowFish算法
+加密算法迭代执行16轮，分组长度为64位
+特征:pi的小数部分A60B31....和出现全0变量
+
+S-box--->密钥--->blowfish_encrypt
+
+.text:004013D3                 xor     eax, eax
+.text:004013D5                 mov     [esp+14h+arg_8], eax     ;初始化两个全0变量，作为特征
+.text:004013D9                 mov     [esp+14h+arg_4], eax
+.text:004013DD                 mov     esi, ebx
+.text:004013DF                 mov     edi, 9
+.text:004013E4
+.text:004013E4 loc_4013E4:                             ; CODE XREF: sub_401350+B8j
+.text:004013E4                 lea     eax, [esp+14h+arg_4]
+.text:004013E8                 lea     ecx, [esp+14h+arg_8]
+
+
+5.AES算法
+aes_init-顺序->aes_encrypt-调用->aes_ecb_encrypt(会调用S盒，作为特征)
+密钥存在于aes_init前
+通过调用关系找到key
+.text:00402783                 mov     edx, [eax+8]
+.text:00402786                 xor     ebx, ebx
+.text:00402788                 shr     edx, 10h
+.text:0040278B                 and     edx, 0FFh
+.text:00402791                 mov     bl, ds:byte_4082DC[edx]     ;AES的S盒，作为特征
+.text:00402797                 mov     edx, [eax+4]
+.text:0040279A                 shr     edx, 8
+.text:0040279D                 and     edx, 0FFh
+.text:004027A3                 mov     esi, ebx
+.text:004027A5                 xor     ebx, ebx
+.text:004027A7                 mov     bl, ds:byte_4082DC[edx]
+.text:004027AD                 mov     edx, [eax+0Ch]
+.text:004027B0                 shr     edx, 18h
+.text:004027B3                 mov     edi, ebx
+.text:004027B5                 xor     ebx, ebx
+.text:004027B7                 mov     bl, ds:byte_4082DC[edx]
+
+
+6.DES算法
+与AES类似，有S-Box
+http://bbs.pediy.com/showthread.php?t=90326
+
+另外还有Twofish，Safer+等分组密码
+
+
+0x23 公开密钥加密算法
+1.RSA算法
+跟踪出大数，即到达了RSA处理的地方，然后可以发现公钥e，然后尝试将n用RSATool分解出p和q，再通过RSATool得到d
+
+.text:004011FC                 push    offset a80c07afc9d2540 ; "80C07AFC9D25404D6555B9ACF3567CF1"  这里就是n
+.text:00401201                 push    esi
+.text:00401202                 call    sub_4039A0
+.text:00401207                 push    offset a10001   ; "10001"  这里是e
+.text:0040120C                 push    ebp
+.text:0040120D                 call    sub_4039A0
+.text:00401212                 push    esi
+.text:00401213                 push    edi
+.text:00401214                 call    sub_402680
+
+0x24 其他算法
+
+1.CRC32算法
+识别crctab
+static const ub4 crctab[256] = {
+  0x00000000, 0x77073096, 0xee0e612c, 0x990951ba, 0x076dc419, 0x706af48f,
+  0xe963a535, 0x9e6495a3, 0x0edb8832, 0x79dcb8a4, 0xe0d5e91e, 0x97d2d988,
+  0x09b64c2b, 0x7eb17cbd, 0xe7b82d07, 0x90bf1d91, 0x1db71064, 0x6ab020f2,
+  0xf3b97148, 0x84be41de, 0x1adad47d, 0x6ddde4eb, 0xf4d4b551, 0x83d385c7,
+  0x136c9856, 0x646ba8c0, 0xfd62f97a, 0x8a65c9ec, 0x14015c4f, 0x63066cd9,
+  0xfa0f3d63, 0x8d080df5, 0x3b6e20c8, 0x4c69105e, 0xd56041e4, 0xa2677172,
+  0x3c03e4d1, 0x4b04d447, 0xd20d85fd, 0xa50ab56b, 0x35b5a8fa, 0x42b2986c,
+  0xdbbbc9d6, 0xacbcf940, 0x32d86ce3, 0x45df5c75, 0xdcd60dcf, 0xabd13d59,
+  0x26d930ac, 0x51de003a, 0xc8d75180, 0xbfd06116, 0x21b4f4b5, 0x56b3c423,
+  0xcfba9599, 0xb8bda50f, 0x2802b89e, 0x5f058808, 0xc60cd9b2, 0xb10be924,
+  0x2f6f7c87, 0x58684c11, 0xc1611dab, 0xb6662d3d, 0x76dc4190, 0x01db7106,
+  0x98d220bc, 0xefd5102a, 0x71b18589, 0x06b6b51f, 0x9fbfe4a5, 0xe8b8d433,
+  0x7807c9a2, 0x0f00f934, 0x9609a88e, 0xe10e9818, 0x7f6a0dbb, 0x086d3d2d,
+  0x91646c97, 0xe6635c01, 0x6b6b51f4, 0x1c6c6162, 0x856530d8, 0xf262004e,
+  0x6c0695ed, 0x1b01a57b, 0x8208f4c1, 0xf50fc457, 0x65b0d9c6, 0x12b7e950,
+  0x8bbeb8ea, 0xfcb9887c, 0x62dd1ddf, 0x15da2d49, 0x8cd37cf3, 0xfbd44c65,
+  0x4db26158, 0x3ab551ce, 0xa3bc0074, 0xd4bb30e2, 0x4adfa541, 0x3dd895d7,
+  0xa4d1c46d, 0xd3d6f4fb, 0x4369e96a, 0x346ed9fc, 0xad678846, 0xda60b8d0,
+  0x44042d73, 0x33031de5, 0xaa0a4c5f, 0xdd0d7cc9, 0x5005713c, 0x270241aa,
+  0xbe0b1010, 0xc90c2086, 0x5768b525, 0x206f85b3, 0xb966d409, 0xce61e49f,
+  0x5edef90e, 0x29d9c998, 0xb0d09822, 0xc7d7a8b4, 0x59b33d17, 0x2eb40d81,
+  0xb7bd5c3b, 0xc0ba6cad, 0xedb88320, 0x9abfb3b6, 0x03b6e20c, 0x74b1d29a,
+  0xead54739, 0x9dd277af, 0x04db2615, 0x73dc1683, 0xe3630b12, 0x94643b84,
+  0x0d6d6a3e, 0x7a6a5aa8, 0xe40ecf0b, 0x9309ff9d, 0x0a00ae27, 0x7d079eb1,
+  0xf00f9344, 0x8708a3d2, 0x1e01f268, 0x6906c2fe, 0xf762575d, 0x806567cb,
+  0x196c3671, 0x6e6b06e7, 0xfed41b76, 0x89d32be0, 0x10da7a5a, 0x67dd4acc,
+  0xf9b9df6f, 0x8ebeeff9, 0x17b7be43, 0x60b08ed5, 0xd6d6a3e8, 0xa1d1937e,
+  0x38d8c2c4, 0x4fdff252, 0xd1bb67f1, 0xa6bc5767, 0x3fb506dd, 0x48b2364b,
+  0xd80d2bda, 0xaf0a1b4c, 0x36034af6, 0x41047a60, 0xdf60efc3, 0xa867df55,
+  0x316e8eef, 0x4669be79, 0xcb61b38c, 0xbc66831a, 0x256fd2a0, 0x5268e236,
+  0xcc0c7795, 0xbb0b4703, 0x220216b9, 0x5505262f, 0xc5ba3bbe, 0xb2bd0b28,
+  0x2bb45a92, 0x5cb36a04, 0xc2d7ffa7, 0xb5d0cf31, 0x2cd99e8b, 0x5bdeae1d,
+  0x9b64c2b0, 0xec63f226, 0x756aa39c, 0x026d930a, 0x9c0906a9, 0xeb0e363f,
+  0x72076785, 0x05005713, 0x95bf4a82, 0xe2b87a14, 0x7bb12bae, 0x0cb61b38,
+  0x92d28e9b, 0xe5d5be0d, 0x7cdcefb7, 0x0bdbdf21, 0x86d3d2d4, 0xf1d4e242,
+  0x68ddb3f8, 0x1fda836e, 0x81be16cd, 0xf6b9265b, 0x6fb077e1, 0x18b74777,
+  0x88085ae6, 0xff0f6a70, 0x66063bca, 0x11010b5c, 0x8f659eff, 0xf862ae69,
+  0x616bffd3, 0x166ccf45, 0xa00ae278, 0xd70dd2ee, 0x4e048354, 0x3903b3c2,
+  0xa7672661, 0xd06016f7, 0x4969474d, 0x3e6e77db, 0xaed16a4a, 0xd9d65adc,
+  0x40df0b66, 0x37d83bf0, 0xa9bcae53, 0xdebb9ec5, 0x47b2cf7f, 0x30b5ffe9,
+  0xbdbdf21c, 0xcabac28a, 0x53b39330, 0x24b4a3a6, 0xbad03605, 0xcdd70693,
+  0x54de5729, 0x23d967bf, 0xb3667a2e, 0xc4614ab8, 0x5d681b02, 0x2a6f2b94,
+  0xb40bbe37, 0xc30c8ea1, 0x5a05df1b, 0x2d02ef8d,
+};
+
+2.Base64编码
+识别字符串
+
+
+0x3 实例
+仅仅列举常见加解密算法在应用分析中存在的情况
+
+1.Thunder多链接资源请求应用md5与aes算法
+分析大致方法
+    找到相应的dll文件，对该dll使用插件进行探测，会发现存在一些算法，根据数据包特点能够从这些算法中大致知道调用了哪个加解密算法，对该算法地址下断，然后再进行
+调试，下面是我分析Thunder时在IDA中找到的数据包解密处理函数，F5后的伪C代码，并对个别地方进行了函数名rename了。
+      v4 = operator new();
+      Memory = (void *)v4;
+      v26 = 0;
+      md5_init(&v14);
+      md5_update(&v14, (const void *)a1, 8u);
+      md5_finish(&v14, (int)&v15);
+      aes_init(&v13, 0x10u, &v15);
+      v16 = 0;
+      v20 = 0;
+      v17 = 0;
+      v21 = 0;
+      v18 = 0;
+      v22 = 0;
+      LOBYTE(v26) = 1;
+      v5 = 12;
+      v19 = 0;
+      v23 = 0;
+      while ( *(_DWORD *)a2 != v5 )
+      {
+        v16 = *(_DWORD *)(v5 + a1);
+        v17 = *(_DWORD *)(v5 + a1 + 4);
+        v18 = *(_DWORD *)(v5 + a1 + 8);
+        v19 = *(_DWORD *)(v5 + a1 + 12);
+        aes_decrypt(&v13, (int)&v16, (int)&v20);
+        v6 = v21;
+        v7 = v2 + v4;
+        v5 += 16;
+        v2 += 16;
+        *(_DWORD *)v7 = v20;
+        v8 = v22;
+        *(_DWORD *)(v7 + 4) = v6;
+        v9 = v23;
+        *(_DWORD *)(v7 + 8) = v8;
+        *(_DWORD *)(v7 + 12) = v9;
+      }
+      memcpy((void *)(a1 + 12), (const void *)v4, v2);
+      v10 = *((_BYTE *)Memory + v2 - 1);
+
+2.百度影音UDP传输与特定节点通信应用crc32运算
+分析过程中crc32容易依靠肉眼识别出来，多对常见加解密算法的具体过程进行分析，会逐渐形成在分析中就知道应用了哪种具体算法以及变形
+
+.text:10047960                 movzx   edi, byte ptr [ecx]
+.text:10047963                 mov     esi, eax
+.text:10047965                 and     esi, 0FFh
+.text:1004796B                 xor     esi, edi
+.text:1004796D                 shr     eax, 8
+.text:10047970                 xor     eax, ds:dword_10068CC8[esi*4]
+.text:10047977                 add     ecx, 1
+.text:1004797A                 sub     edx, 1
+.text:1004797D                 jnz     short loc_10047960
+.text:1004797F                 pop     edi
+.text:10047980                 pop     esi
+
+
+#define crc32_t unsigned long 
+crc32_t dataCRC32 = 0xfffffffe;
+for (u_int32_t i =0 ;i<dsize - 4; i++){
+     u_int32_t tmp = (dataCRC32 & 0xff)^pdata[i+4];
+     dataCRC32 = (dataCRC32>>8) ^ crc_table[tmp];
+}
+
+
+3.飞鸽传书采用Blowfish加密方式加密消息
+开源，直接源码分析
+else if (capa & IPMSG_BLOWFISH_128) {	// blowfish
+		// blowfish密钥随机产生
+		if (!pCryptGenRandom(target_csp, len = 128/8, data))
+			return	GetLastErrorMsg("CryptGenRandom"), FALSE;
+		// 构造一个Blowfish的类
+		CBlowFish	bl(data, len);
+		//Blowfish的密钥经过RSA加密
+		if (!pCryptEncrypt(hExKey, 0, TRUE, 0, data, (DWORD *)&len, MAX_BUF))
+			return GetLastErrorMsg("CryptEncrypt"), FALSE;
+		bin2str_revendian(data, len, (char *)skey);	// 将二进制代码转化为字符串
+		// 采用Blowfish加密数据
+		encMsgLen = bl.Encrypt(msg_data, data, msgLen, BF_CBC|BF_PKCS5, iv);
+	}
