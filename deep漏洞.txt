@@ -1,0 +1,21 @@
+
+漏洞分析大致情况
+
+针对具体漏洞类型,尝试漏洞分析->思考漏洞产生代码级别上的问题->思考如何触发这个漏洞->思考如何发现这个漏洞->思考如何利用这个漏洞
+
+对应着一些漏洞的博客进行学习调试，坚持不懈的调试，然后写心得，为什么这么调，思路是什么
+
+漏洞类型
+
+    命令注入(Command Injection)
+    跨站脚本(Cross-Site Scripting)
+    格式化串(Format String)
+    缓冲区溢出(Buffer Overflow)
+    整型溢出(Integer Overflow)
+    整数符号扩展(Signed Integer Extern)
+    双重释放内存(Double Free)
+    释放内存后再使用(Use After Free)
+    数组索引越界(Array Index Overflow)
+    Directory Traversal
+    Sql Injection
+等等
