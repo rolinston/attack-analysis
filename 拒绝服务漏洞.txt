@@ -1,0 +1,25 @@
+科普下栈上溢、栈下溢和栈耗尽
+栈上溢:如堆栈已满，但还想再存入信息，这种情况称为堆栈上溢
+
+栈下溢:如堆栈已空，但还想再取出信息，这种情况称为堆栈下溢
+
+栈耗尽:
+函数内部(局部变量)禁止定义大数组，而应使用动态内存；如数组需传入函数应使用指针作为参数； 
+其实就算你调用这个函数不出错，但是如果函数嵌套很多的话也会发生segment error 
+在某些资源有限的系统下，更需要注意这个问题，比如51单片机
+
+函数内是在栈分配内存，栈大小一般限制在1M到2M 
+函数外则是全局变量，在DATA段分配内存
+，譬如可能通过触发无限递归来耗尽栈内存，导致拒绝服务的情况。
+http://fanwei51880.blog.163.com/blog/static/32406740201112604728830/
+
+
+内核型的
+ProbeForWrite(UserBuffer, OutputBufferLength, 1u);
+*(_DWORD *)UserBuffer = v7
+ProbeForWrite探测，但是使用ProbeForWrite函数不当!因为处理过程中相信了用户输入的OutputBufferLength，那么只要用户输入的OutputBufferLength为0，就可以躲过ProbeForWrite检查
+
+
+
+
+

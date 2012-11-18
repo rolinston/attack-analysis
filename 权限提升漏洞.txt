@@ -1,0 +1,29 @@
+
+内核漏洞:
+IoControl Fuzz
+由于驱动程序中处理例程没有检查用户传入的缓冲区地址的合法性，造成任意内核地址可写的漏洞,用户可以发送恶意的DeviceIoControl的来完全的控制计算机。
+
+http://www.wooyun.org/bugs/wooyun-2010-045
+http://www.xfocus.net/articles/200707/925.html
+
+1.分析崩溃产生的原因
+2.寻找污染源，从中找到哪些地方可控,譬如call dword ptr [eax]
+
+利用:往可控制的地址修改为0，通过在0地址处申请内存，并存放ring0 shellcode就可以完美的利用这个漏洞
+
+
+在比如如下:
+mov eax,[eax+IRP.UserBuffer]
+mov ecx,[ebp+var_6C]
+mov [eax],ecx
+
+再譬如如下:
+1.对于用户输入数据，*(_DWORD *)firstDWORD = 0;
+2.
+mov ecx,[ebp+arg_0]
+mov eax,[ecx]
+mov ecx,[ecx+4]
+
+
+
+
