@@ -1,0 +1,17 @@
+http://dvlabs.tippingpoint.com/blog/2008/07/17/mindshare-hit-tracing-in-windbg
+http://sec-mode.blogspot.com/2012/09/windbg-and-ida-to-improved-code-flow.html
+http://www.exploit-monday.com/2011/07/integrating-windbg-and-ida-for-improved.html
+http://www.dotblogs.com.tw/cmd4shell/archive/2012/09/01/74525.aspx
+
+API Tracing
+http://bbs.pediy.com/showthread.php?t=134171
+http://bbs.pediy.com/showthread.php?t=151870  里头的代码没有看明白
+
+http://securityxploded.com/api-call-tracing-with-pefile-pydbg-and-idapython.php#API-CALL-PEfile-PyDbg
+OD的http://blog.csdn.net/hgy413/article/details/7712422
+
+指令跟踪，符号路径
+
+这是一个非常具有研究性质的方向
+
+
