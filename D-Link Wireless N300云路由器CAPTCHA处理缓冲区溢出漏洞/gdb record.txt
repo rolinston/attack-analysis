@@ -1,0 +1,9 @@
+http://www.yolinux.com/TUTORIALS/GDB-Commands.html
+
+
+gdb reverse
+http://blog.csdn.net/cherylnatsu/article/details/6436570
+http://www.sourceware.org/gdb/wiki/ProcessRecord/Tutorial
+
+
+http://www.sourceware.org/gdb/wiki/ProcessRecord/Tutorial

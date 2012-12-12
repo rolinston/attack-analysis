@@ -1,0 +1,13 @@
+http://www.cnblogs.com/chenlong828/archive/2011/05/13/2045189.html
+
+
+动态翻译技术
+http://bbs.chinaunix.net/thread-1962719-1-1.html
+http://bbs.chinaunix.net/forum.php?mod=viewthread&tid=1961688&page=1#pid14042292
+
+QEMU源码分析
+http://blog.csdn.net/ustc_dylan/article/details/6784876
+
+http://blog.csdn.net/ustc_dylan
+http://blog.chinaunix.net/uid/20940095.html
+http://blog.chinaunix.net/uid/11196893.html
